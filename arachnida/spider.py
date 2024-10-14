@@ -12,10 +12,15 @@ def handle_sigint(signal_number, frame):
 
 signal.signal(signal.SIGINT, handle_sigint)
 
+def ThreadPath(url, depth):
+    DownloadImages(url)
+    RecursiveEnum()
+    
+
 def DownloadImages(url):
     response = requests.get(url)
     if not response.ok:
-        return
+        return 
     pattern = r"https?://\S+\.(?:jpeg|jpg|png|gif|bmp)"
     image_links = re.findall(pattern, str(response.content))
     if len(image_links) > 0:
@@ -28,14 +33,16 @@ def DownloadImages(url):
             handle.write(image.content)
 
 
-def recursiveEnum(url, depth):
+def RecursiveEnum(url, depth):
     if url[-1] != '/':
         url += '/'
-    print(max_depth)
     if (depth == max_depth):
         return 
     
     for word in wordlist.text.splitlines():
+        if (word.startswith('#')):
+            continue
+        print(word)
         full_url = url + str(word)
         response = requests.get(full_url)
 
@@ -47,7 +54,7 @@ def recursiveEnum(url, depth):
                     threads.append(thread)
                     thread.start()
                     print(f"{response.status_code}: {response.url.split('/')[-1]}")
-                    recursiveEnum(response.url, depth + 1)
+                    
     for thread in threads:
         threads.join()
 
@@ -104,9 +111,9 @@ def main():
         return print("Usage: python3 spider.py -[FLAGS] [URL]")
     ret = ParseFlags(sys.argv[1:-1])
     if ret == 1:
-        recursiveEnum(sys.argv[-1], 0)
+        RecursiveEnum(sys.argv[-1], 0)
     elif not ret:
-        recursiveEnum(sys.argv[-1], 0)
+        RecursiveEnum(sys.argv[-1], 0)
     else:
         return 0
     return 1
