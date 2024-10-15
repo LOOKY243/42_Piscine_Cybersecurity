@@ -1,13 +1,15 @@
-import sys, re, os, requests, signal
+import sys, re, os, requests, signal, threading
 from concurrent.futures import ThreadPoolExecutor
 
 
 base_url = ""
 visited_urls = set()
-wordlist = requests.get("https://raw.githubusercontent.com/3ndG4me/KaliLists/refs/heads/master/dirbuster/directory-list-lowercase-2.3-medium.txt")
+wordlist = requests.get("https://raw.githubusercontent.com/3ndG4me/KaliLists/refs/heads/master/dirbuster/directory-list-lowercase-2.3-small.txt")
 max_depth = -1
 image_folder = "./data/"
 executor = ThreadPoolExecutor(max_workers=20)
+download_lock = threading.Lock()
+Downloaded = set()
 
 def handle_sigint(signal_number, frame):
     print("\nCtrl + C detected! Exiting...")
@@ -15,6 +17,21 @@ def handle_sigint(signal_number, frame):
     exit(0)
 
 signal.signal(signal.SIGINT, handle_sigint)
+
+def launch():
+    ascii_art = r"""
+ ________  ________  ___  ________  _______   ________      ________  ___    ___ 
+|\   ____\|\   __  \|\  \|\   ___ \|\  ___ \ |\   __  \    |\   __  \|\  \  /  /|
+\ \  \___|\ \  \|\  \ \  \ \  \_|\ \ \   __/|\ \  \|\  \   \ \  \|\  \ \  \/  / /
+ \ \_____  \ \   ____\ \  \ \  \ \\ \ \  \_|/_\ \   _  _\   \ \   ____\ \    / / 
+  \|____|\  \ \  \___|\ \  \ \  \_\\ \ \  \_|\ \ \  \\  \| __\ \  \___|\/  /  /  
+    ____\_\  \ \__\    \ \__\ \_______\ \_______\ \__\\ _\|\__\ \__\ __/  / /    
+   |\_________\|__|     \|__|\|_______|\|_______|\|__|\|__\|__|\|__||\___/ /     
+   \|_________|  
+   """
+
+    for line in ascii_art.splitlines():
+        print("\033[1m" + line + "\033[0m")
 
 def DownloadImages(url):
     try:
@@ -39,12 +56,19 @@ def DownloadImages(url):
                 image_url = base_url.rstrip('/') + '/' + link.lstrip('/')
             
             image_name = image_folder + image_url.split('/')[-1]
+            with download_lock:
+                if image_name in Downloaded:
+                    continue
+                Downloaded.add(image_name)
+
             image_response = requests.get(image_url)
             image_response.raise_for_status()
-            
-            with open(image_name, "wb") as handle:
-                handle.write(image_response.content)
-            print(f"Downloaded: {image_name}")
+        
+            content_type = image_response.headers.get("Content-Type")
+            if "image" in content_type:
+                with open(image_name, "wb") as handle:
+                    handle.write(image_response.content)
+                print(f"Downloaded: {image_name}")
         except requests.RequestException as e:
             print(f"Failed to download image from {link}: {e}")
 
@@ -120,7 +144,7 @@ def main():
     if len(sys.argv) == 1:
         print("Usage: python3 spider.py -[FLAGS] [URL]")
         return
-
+    launch()
     global base_url
     base_url = sys.argv[-1]
     ret = ParseFlags(sys.argv[1:-1])
