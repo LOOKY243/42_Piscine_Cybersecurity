@@ -1,4 +1,5 @@
-import sys, os, subprocess, json
+import sys, os, subprocess
+
 
 def launch():
     ascii_art = r"""
@@ -16,7 +17,11 @@ def launch():
     for line in ascii_art.splitlines():
         print("\033[1m" + line + "\033[0m")
 
+
 def ProcessFile(file):
+    if not os.path.isfile(file):
+        print(f"Error: File {file} not found")
+        return 0
     process = subprocess.Popen(["exiftool", file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, shell=False)
     output, errors = process.communicate()
     if not errors:
@@ -27,7 +32,9 @@ def ProcessFile(file):
         print("")
         for line in output.splitlines():
             print(line.decode("utf-8"))
-        
+    return 1
+
+
 def CheckFileExt(file):
     file_extensions = ["png", "jpg", "jpeg", "bmp", "gif"]
     name_splits = file.split('.')
@@ -39,16 +46,16 @@ def CheckFileExt(file):
 def main():
     if len(sys.argv) <= 1:
         print("Usage: python3 scorpion.py FILE1 [FILE 2...]")
-        return 0
+        return 1
     launch()
     for file in sys.argv[1:]:
         if not CheckFileExt(file):
-            return 0
+            print("Error: Unsuported file extension")
+            return 1
         else:
             ProcessFile(file)
-    return 1
+    return 0
     
-
 
 if __name__ == "__main__":
     main()

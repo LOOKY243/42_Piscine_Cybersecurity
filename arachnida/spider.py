@@ -11,12 +11,15 @@ executor = ThreadPoolExecutor(max_workers=20)
 download_lock = threading.Lock()
 Downloaded = set()
 
+
 def handle_sigint(signal_number, frame):
     print("\nCtrl + C detected! Exiting...")
     executor.shutdown(wait=True)
     exit(0)
 
+
 signal.signal(signal.SIGINT, handle_sigint)
+
 
 def launch():
     ascii_art = r"""
@@ -32,6 +35,7 @@ def launch():
 
     for line in ascii_art.splitlines():
         print("\033[1m" + line + "\033[0m")
+
 
 def DownloadImages(url):
     try:
@@ -72,6 +76,7 @@ def DownloadImages(url):
         except requests.RequestException as e:
             print(f"Failed to download image from {link}: {e}")
 
+
 def RecursiveEnum(url, depth):
     if url[-1] != '/':
         url += '/'
@@ -92,9 +97,11 @@ def RecursiveEnum(url, depth):
         except requests.RequestException as e:
             continue
 
+
 def ThreadPath(url, depth):
     DownloadImages(url)
     RecursiveEnum(url, depth)
+
 
 def ParseFlags(flags):
     global max_depth, image_folder
@@ -140,10 +147,11 @@ def ParseFlags(flags):
         i += 1
     return 1 if 'r' in seen_flags else 0
 
+
 def main():
     if len(sys.argv) == 1:
         print("Usage: python3 spider.py -[FLAGS] [URL]")
-        return
+        return 1
     launch()
     global base_url
     base_url = sys.argv[-1]
@@ -153,8 +161,10 @@ def main():
     elif ret == 0:
         DownloadImages(base_url)
     else:
-        return
+        return 1
     executor.shutdown(wait=True)
+    return 0
+
 
 if __name__ == "__main__":
     main()
