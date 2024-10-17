@@ -1,0 +1,30 @@
+services:
+  
+  nginx:
+    container_name: nginx
+    build:
+      context: ./nginx
+      dockerfile: dockerfile
+    networks:
+      - ft_onion
+    restart: always
+    ports:
+      - "80:80"
+  
+  ssh:
+    container_name: ssh
+    build:
+      context: ./ssh
+      dockerfile: dockerfile
+      args:
+        USERNAME: ${username}
+        PASSWORD: ${password}   
+    networks:
+      - ft_onion
+    restart: always
+    ports:
+      - "4242:4242"
+
+networks:
+  ft_onion:
+    driver: bridge

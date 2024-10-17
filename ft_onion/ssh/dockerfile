@@ -1,0 +1,17 @@
+FROM debian:latest
+
+ARG USERNAME
+ARG PASSWORD
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -y && apt-get upgrade -y \
+    && apt-get install -y curl openssh-server
+
+COPY sshd.config /etc/ssh/sshd_config
+
+RUN mkdir /var/run/sshd
+
+RUN useradd -m --shell /bin/bash ${USERNAME} && \
+    echo "${USERNAME}:${PASSWORD}" | chpasswd
+CMD ["/usr/sbin/sshd", "-D"]

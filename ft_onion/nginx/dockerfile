@@ -1,0 +1,17 @@
+FROM nginx:latest
+
+RUN apt-get update -y && apt-get upgrade -y && apt-get install tor -y
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+RUN mkdir -p /var/www/html
+COPY index.html /var/www/html
+
+# tor
+RUN mkdir -p /var/lib/tor/hidden_service/ && \
+    chown -R debian-tor:debian-tor /var/lib/tor/hidden_service/ && \
+    chmod 0700 /var/lib/tor/hidden_service/
+
+COPY torrc /etc/tor/torrc
+
+CMD service tor start && nginx -g 'daemon off;'

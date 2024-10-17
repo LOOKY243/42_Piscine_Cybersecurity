@@ -19,8 +19,8 @@ def launch():
 
 
 def ProcessFile(file):
-    if not os.path.isfile(file):
-        print(f"Error: File {file} not found")
+    if not os.access(file, os.R_OK):
+        print(f"Error: File {file} not found or not accessible")
         return 0
     process = subprocess.Popen(["exiftool", file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, shell=False)
     output, errors = process.communicate()
