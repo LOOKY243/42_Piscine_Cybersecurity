@@ -1,13 +1,13 @@
 import sys, re, os, requests, signal, threading
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urljoin
 
 
 base_url = ""
 visited_urls = set()
-wordlist = requests.get("https://raw.githubusercontent.com/3ndG4me/KaliLists/refs/heads/master/dirbuster/directory-list-lowercase-2.3-small.txt")
 max_depth = -1
 image_folder = "./data/"
-executor = ThreadPoolExecutor(max_workers=20)
+executor = ThreadPoolExecutor(max_workers=10)
 download_lock = threading.Lock()
 Downloaded = set()
 
@@ -38,26 +38,22 @@ def launch():
 
 
 def DownloadImages(url):
+
     try:
         response = requests.get(url)
         response.raise_for_status()
     except requests.RequestException as e:
-        print(f"Failed to retrieve {url}: {e}")
         return
 
-    pattern = r'<img\s+[^>]*src="([^"]+\.(?:jpeg|jpg|png|gif|bmp))"'
-    image_links = re.findall(pattern, str(response.content))
-
+    pattern = r'(?:href|src)=["\']?([^"\'>]+(?:\.jpeg|\.jpg|\.png|\.gif|\.bmp))["\']?'
+    image_links = re.findall(pattern, response.text)
     if image_links:
         if not os.path.isdir(image_folder):
             os.makedirs(image_folder)
 
     for link in image_links:
         try:
-            if link.startswith('http'):
-                image_url = link
-            else:
-                image_url = base_url.rstrip('/') + '/' + link.lstrip('/')
+            image_url = urljoin(url, link)
             
             image_name = image_folder + image_url.split('/')[-1]
             with download_lock:
@@ -74,33 +70,30 @@ def DownloadImages(url):
                     handle.write(image_response.content)
                 print(f"Downloaded: {image_name}")
         except requests.RequestException as e:
-            print(f"Failed to download image from {link}: {e}")
+            continue
 
 
 def RecursiveEnum(url, depth):
     if url[-1] != '/':
         url += '/'
-    if depth >= max_depth:
+
+    DownloadImages(url)
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException as e:
         return
     
-    for word in wordlist.text.splitlines():
-        if word.startswith('#'):
-            continue
-        full_url = url.rstrip('/') + '/' + word.lstrip('/')
-        
-        try:
-            response = requests.get(full_url)
-            if 200 <= response.status_code < 400:
-                if full_url not in visited_urls:
-                    visited_urls.add(full_url)
-                    executor.submit(ThreadPath, full_url, depth + 1)
-        except requests.RequestException as e:
-            continue
+    pattern = r'(?:href|src)=["\']?([^"\'>]+)["\']?'
+    matches = re.findall(pattern, response.text)
+    for match in matches:
+        full_url = urljoin(url, match)
 
-
-def ThreadPath(url, depth):
-    DownloadImages(url)
-    RecursiveEnum(url, depth)
+        if full_url not in visited_urls:
+            visited_urls.add(full_url)
+            if depth + 1 <= max_depth or max_depth == -1:
+                executor.submit(RecursiveEnum, full_url, depth + 1)
 
 
 def ParseFlags(flags):
@@ -128,7 +121,7 @@ def ParseFlags(flags):
                     if i + 1 < len(flags):
                         try:
                             max_depth = int(flags[i + 1])
-                            if max_depth < 0:
+                            if max_depth <= 0:
                                 print("Error: Invalid depth value for -l")
                                 return 2
                             seen_flags.add('l')
@@ -156,9 +149,9 @@ def main():
     global base_url
     base_url = sys.argv[-1]
     ret = ParseFlags(sys.argv[1:-1])
-    if ret == 1:
-        RecursiveEnum(base_url, 0)
-    elif ret == 0:
+    if ret == 1 and max_depth != 1:
+        RecursiveEnum(base_url, 1)
+    elif ret == 0 or max_depth == 1:
         DownloadImages(base_url)
     else:
         return 1
