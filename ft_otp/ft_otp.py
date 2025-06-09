@@ -68,7 +68,7 @@ def KFlag(key_path):
         print("ft_otp.py: error: could not read key")
         return 0
 
-    counter_file = ".counter.txt"
+    counter_file = ".ft_otpCounter.txt"
     if not os.path.exists(counter_file):
         counter = 0
     else:
