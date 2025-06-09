@@ -1,4 +1,5 @@
-import re, sys, time, os, hashlib, hmac
+import re, sys, os, hashlib, hmac, argparse
+
 def launch():
     ascii_art = r"""
  ________ _________        ________  _________  ________   ________  ___    ___ 
@@ -11,12 +12,8 @@ def launch():
                                                                    \|___|/      
                                                                             
    """
-
     for line in ascii_art.splitlines():
         print("\033[1m" + line + "\033[0m")
-
-def get_current_time():
-    return int(time.time())
 
 
 def is_hexadecimal(string):
@@ -25,70 +22,83 @@ def is_hexadecimal(string):
 
 
 def CheckExtension(filename):
-    return filename.split('.')[-1] == 'hex'
+    return filename.lower().endswith(".hex")
 
 
-def GFlag(key):
-    if not CheckExtension(key):
-        print("ft_otp.py: error: key must be 64 hexadecimal characters.")
+def GFlag(key_file):
+    if not CheckExtension(key_file):
+        print("ft_otp.py: error: key must be a .hex file containing 64 hexadecimal characters.")
         return 0
-    if not os.path.isfile(key):
-        print(f"Error: Key {key} not found")
+    if not os.path.isfile(key_file):
+        print(f"Error: Key {key_file} not found")
         return 0
 
-    with open(key, 'r') as handle:
-        line = handle.readline().strip()
+    with open(key_file, 'r', encoding="utf-8") as f:
+        line = f.readline().strip()
+        print(f"{len(line)}: {line}")
         if len(line) != 64 or not is_hexadecimal(line):
             print("ft_otp.py: error: key must be 64 hexadecimal characters.")
             return 0
-        val = get_current_time()
-        byte_arr = bytearray(val.to_bytes(8, sys.byteorder))
-        hmac_digest = hmac.new(byte_arr, bytes.fromhex(line), hashlib.sha256).digest()
+        key_bytes = bytes.fromhex(line)
 
-    with open("ft_otp.key", "wb") as handle:
-        handle.write(hmac_digest)
-        print("ft_otp.py: Success: key generated succesfully")
+    with open("ft_otp.key", "wb") as f:
+        f.write(key_bytes)
+        print("ft_otp.py: Success: key generated successfully")
     return 1
 
 
-def KFlag(key):
+def hotp(key_bytes, counter):
+    counter_bytes = counter.to_bytes(8, 'big')
+    hmac_digest = hmac.new(key_bytes, counter_bytes, hashlib.sha1).digest()
+    offset = hmac_digest[-1] & 0x0F
+    truncated = hmac_digest[offset:offset+4]
+    code = int.from_bytes(truncated, 'big') & 0x7FFFFFFF
+    return code % 10**6
 
-    with open(key, 'rb') as handle:
-        hmac_digest = handle.read()
 
-        val = get_current_time()
-        byte_arr = bytearray(val.to_bytes(8, sys.byteorder))
+def KFlag(key_path):
+    if not os.path.isfile(key_path):
+        print(f"ft_otp.py: error: key file {key_path} not found")
+        return 0
 
-        hmac_digest = hmac.new(byte_arr, hmac_digest, hashlib.sha256).digest()
-        
-        offset = hmac_digest[-1] & 0x0F
-        truncated_hash = hmac_digest[offset:offset + 4]
+    try:
+        with open(key_path, 'rb') as f:
+            key_bytes = f.read()
+    except:
+        print("ft_otp.py: error: could not read key")
+        return 0
 
-        otp = int.from_bytes(truncated_hash, sys.byteorder) & 0x7FFFFFFF
-        otp %= 10**6
-    
-    print(f"ft_otp.py: Success: {otp}")
-    
+    counter_file = ".counter.txt"
+    if not os.path.exists(counter_file):
+        counter = 0
+    else:
+        with open(counter_file, 'r', encoding="utf-8") as f:
+            counter = int(f.read())
+
+    otp = hotp(key_bytes, counter)
+
+    with open(counter_file, 'w') as f:
+        f.write(str(counter + 1))
+
+    print(f"ft_otp.py: Success: {otp:06d}")
     return 1
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-g", metavar="key.hex", help="Generate and save binary key from a 64-digit hex string")
+    group.add_argument("-k", metavar="ft_otp.key", help="Use stored key to generate HOTP code")
+    args = parser.parse_args()
+
     launch()
-    if len(sys.argv) <= 2:
-        print("ft_otp.py: Usage: python3 ft_otp.py -[FLAG] [ARG]")
-        print("ft_otp.py: This script does not handle flags -k and -g at the same time")
-        return 1
-    if sys.argv[1] == "-g":
-        if not GFlag(sys.argv[2]):
-            return 1
-        return 0
-    elif sys.argv[1] == "-k":
-        if not KFlag(sys.argv[2]):
-            return 1
-        return 0
-    print(f"ft_otp.py: error: Unknown flag {sys.argv[1]}")
-    return 1
-    
+
+    if args.g:
+        if not GFlag(args.g):
+            sys.exit(1)
+    elif args.k:
+        if not KFlag(args.k):
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
